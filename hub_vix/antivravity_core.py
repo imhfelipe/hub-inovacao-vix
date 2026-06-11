@@ -93,7 +93,12 @@ DB_INICIATIVAS = [
 
 def get_dados_iniciativas() -> list[dict]:
     """Retorna os dados base convertidos em dicionários para compatibilidade com serialização."""
-    return [asdict(i) for i in DB_INICIATIVAS]
+    dados_dict = []
+    for i in DB_INICIATIVAS:
+        d = asdict(i)
+        d["roi_fmt"] = formatar_roi(i.roi)
+        dados_dict.append(d)
+    return dados_dict
 
 def get_dados_realtime() -> list[dict]:
     """
@@ -101,6 +106,7 @@ def get_dados_realtime() -> list[dict]:
     Retorna uma lista de dicionários correspondentes às iniciativas modificadas.
     """
     dados = deepcopy(DB_INICIATIVAS)
+    res = []
 
     for i in dados:
         if i.roi > 0:
@@ -120,7 +126,11 @@ def get_dados_realtime() -> list[dict]:
             i.status = "Concluída"
             i.tem_indicador = True
 
-    return [asdict(item) for item in dados]
+        d = asdict(i)
+        d["roi_fmt"] = formatar_roi(i.roi)
+        res.append(d)
+
+    return res
 
 def calcular_kpis(iniciativas: list[dict]) -> dict:
     """Processa o portfólio de iniciativas e retorna os KPIs do Hub."""

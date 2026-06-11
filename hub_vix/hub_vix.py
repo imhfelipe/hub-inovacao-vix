@@ -1,11 +1,11 @@
 """
 hub_vix.py — Interface Reativa do Hub de Inovação VIX
 Dashboard em tempo real com background task de alto desempenho.
-Redesenhado para Visual SaaS Premium de nível corporativo.
+Refatorado para Design SaaS Premium de nível "Data Intelligence" (Glassmorphism, Recharts Donut, micro-tendências e tabela otimizada).
 """
 
 import asyncio
-from typing import TypedDict
+from typing import TypedDict, List, Dict
 from datetime import datetime
 
 import reflex as rx
@@ -40,6 +40,7 @@ class Iniciativa(TypedDict):
     responsavel: str
     prioridade: str
     horas: int
+    roi_fmt: str
 
 
 # ─────────────────────────────────────────────
@@ -47,7 +48,7 @@ class Iniciativa(TypedDict):
 # ─────────────────────────────────────────────
 
 class DashboardState(rx.State):
-    """Estado global com atualização em tempo real via background task."""
+    """Estado global com atualização em tempo real, memória histórica e tendências."""
 
     iniciativas_raw: list[Iniciativa] = get_dados_iniciativas()
     area_selecionada: str = "Todas"
@@ -58,7 +59,12 @@ class DashboardState(rx.State):
     relogio: str = datetime.now().strftime("%H:%M:%S")
     tick: int = 0  # contador de ticks
 
-    # ── Vars derivadas ────────────────────────
+    # Memória histórica para micro-indicadores de tendência (semana anterior simulada)
+    prev_roi: float = float(calcular_kpis(get_dados_iniciativas())["roi"])
+    prev_horas: float = float(calcular_kpis(get_dados_iniciativas())["horas"])
+    prev_governanca: float = float(calcular_kpis(get_dados_iniciativas())["governanca"])
+
+    # ── Vars derivadas de KPIs ────────────────
 
     @rx.var
     def iniciativas(self) -> list[Iniciativa]:
@@ -84,18 +90,69 @@ class DashboardState(rx.State):
     def kpi_total(self) -> int:
         return calcular_kpis(self.iniciativas).get("total", 0)
 
-    @rx.var
-    def kpi_em_andamento(self) -> int:
-        return calcular_kpis(self.iniciativas).get("em_andamento", 0)
+    # ── Vars para Gráfico Donut ────────────────
 
     @rx.var
-    def kpi_concluidas(self) -> int:
-        return calcular_kpis(self.iniciativas).get("concluidas", 0)
-
-    @rx.var
-    def kpi_planejadas(self) -> int:
+    def status_dist(self) -> List[Dict]:
         k = calcular_kpis(self.iniciativas)
-        return k.get("total", 0) - k.get("em_andamento", 0) - k.get("concluidas", 0)
+        em_andamento = k.get("em_andamento", 0)
+        concluidas = k.get("concluidas", 0)
+        planejadas = k.get("total", 0) - em_andamento - concluidas
+        return [
+            {"name": "Concluídas", "value": concluidas},
+            {"name": "Em Andamento", "value": em_andamento},
+            {"name": "Planejadas", "value": planejadas},
+        ]
+
+    # ── Micro-indicadores de Tendência ─────────
+
+    @rx.var
+    def roi_atual(self) -> float:
+        return float(calcular_kpis(self.iniciativas).get("roi", 0.0))
+
+    @rx.var
+    def horas_atual(self) -> float:
+        return float(calcular_kpis(self.iniciativas).get("horas", 0))
+
+    @rx.var
+    def governanca_atual(self) -> float:
+        return float(calcular_kpis(self.iniciativas).get("governanca", 0.0))
+
+    @rx.var
+    def roi_trend_icon(self) -> rx.Var:
+        curr = self.roi_atual
+        prev = self.prev_roi
+        return rx.cond(curr > prev, "arrow-up-right", rx.cond(curr < prev, "arrow-down-right", "minus"))
+
+    @rx.var
+    def roi_trend_color(self) -> rx.Var:
+        curr = self.roi_atual
+        prev = self.prev_roi
+        return rx.cond(curr > prev, "#10b981", rx.cond(curr < prev, "#f43f5e", "#64748b"))
+
+    @rx.var
+    def horas_trend_icon(self) -> rx.Var:
+        curr = self.horas_atual
+        prev = self.prev_horas
+        return rx.cond(curr > prev, "arrow-up-right", rx.cond(curr < prev, "arrow-down-right", "minus"))
+
+    @rx.var
+    def horas_trend_color(self) -> rx.Var:
+        curr = self.horas_atual
+        prev = self.prev_horas
+        return rx.cond(curr > prev, "#10b981", rx.cond(curr < prev, "#f43f5e", "#64748b"))
+
+    @rx.var
+    def governanca_trend_icon(self) -> rx.Var:
+        curr = self.governanca_atual
+        prev = self.prev_governanca
+        return rx.cond(curr > prev, "arrow-up-right", rx.cond(curr < prev, "arrow-down-right", "minus"))
+
+    @rx.var
+    def governanca_trend_color(self) -> rx.Var:
+        curr = self.governanca_atual
+        prev = self.prev_governanca
+        return rx.cond(curr > prev, "#10b981", rx.cond(curr < prev, "#f43f5e", "#64748b"))
 
     @rx.var
     def live_label(self) -> str:
@@ -106,6 +163,13 @@ class DashboardState(rx.State):
         return "#10b981" if self.is_live else "#f59e0b"
 
     # ── Background: loop de tempo real ────────
+
+    def guardar_historico(self):
+        """Salva a leitura de KPIs anterior para calcular tendências antes de puxar dados novos."""
+        k = calcular_kpis(self.iniciativas)
+        self.prev_roi = float(k.get("roi", 0.0))
+        self.prev_horas = float(k.get("horas", 0))
+        self.prev_governanca = float(k.get("governanca", 0.0))
 
     @background
     async def iniciar_live(self):
@@ -120,6 +184,7 @@ class DashboardState(rx.State):
                 self.tick += 1
                 # A cada `intervalo_seg` ticks, busca novos dados
                 if self.is_live and self.tick % self.intervalo_seg == 0:
+                    self.guardar_historico()
                     self.iniciativas_raw = get_dados_realtime()
 
     # ── Ações do usuário ──────────────────────
@@ -137,26 +202,57 @@ class DashboardState(rx.State):
             self.intervalo_seg = 5
 
     def atualizar_agora(self):
+        self.guardar_historico()
         self.iniciativas_raw = get_dados_realtime()
 
 
 # ─────────────────────────────────────────────
-# COMPONENTES PREMIUM DESIGN SYSTEM
+# COMPONENTES PREMIUM DESIGN SYSTEM (GLASSMORPHISM)
 # ─────────────────────────────────────────────
 
 def badge_status(status: str) -> rx.Component:
-    """Badge elegante de status arredondado."""
-    return rx.badge(
-        status,
-        color_scheme=rx.cond(
-            status == "Concluída", "green",
-            rx.cond(status == "Em Andamento", "indigo", "orange")
+    """Badge de status com ícone interno dinâmico."""
+    return rx.cond(
+        status == "Concluída",
+        rx.badge(
+            rx.hstack(
+                rx.icon("circle-check", size=12),
+                rx.text("Concluída", size="1"),
+                spacing="1",
+                align="center",
+            ),
+            color_scheme="green",
+            variant="soft",
+            radius="full",
+            padding_x="2",
         ),
-        variant="soft",
-        radius="full",
-        padding_x="3",
-        padding_y="1",
-        weight="medium",
+        rx.cond(
+            status == "Em Andamento",
+            rx.badge(
+                rx.hstack(
+                    rx.icon("clock", size=12),
+                    rx.text("Em Andamento", size="1"),
+                    spacing="1",
+                    align="center",
+                ),
+                color_scheme="indigo",
+                variant="soft",
+                radius="full",
+                padding_x="2",
+            ),
+            rx.badge(
+                rx.hstack(
+                    rx.icon("calendar", size=12),
+                    rx.text("Planejada", size="1"),
+                    spacing="1",
+                    align="center",
+                ),
+                color_scheme="orange",
+                variant="soft",
+                radius="full",
+                padding_x="2",
+            ),
+        ),
     )
 
 
@@ -176,10 +272,11 @@ def badge_prioridade(prioridade: str) -> rx.Component:
     )
 
 
-def kpi_card(label: str, valor, icon: str, cor: str) -> rx.Component:
-    """Card de KPI premium com gradiente de borda sutil e hover interativo."""
+def kpi_card(label: str, valor, icon: str, cor: str, border_left: str, trend_icon: str = "", trend_color: str = "") -> rx.Component:
+    """Card de KPI com Glassmorphism, borda lateral colorida, glow no texto e micro-indicador de tendência."""
     return rx.card(
         rx.vstack(
+            # Título e ícone superior
             rx.hstack(
                 rx.icon(icon, color=cor, size=18),
                 rx.text(label, size="1", color="#94a3b8", weight="medium"),
@@ -187,29 +284,96 @@ def kpi_card(label: str, valor, icon: str, cor: str) -> rx.Component:
                 width="100%",
                 align="center",
             ),
-            rx.text(
-                valor,
-                size="8",
-                weight="bold",
-                color=cor,
-                margin_top="2",
+            # Valor e micro-tendência
+            rx.hstack(
+                rx.text(
+                    valor,
+                    size="8",
+                    weight="bold",
+                    color=cor,
+                    margin_top="2",
+                    text_shadow=f"0 0 20px {cor}3b",  # Brilho text-shadow sutil
+                ),
+                rx.cond(
+                    trend_icon != "",
+                    rx.box(
+                        rx.cond(
+                            trend_icon == "arrow-up-right",
+                            rx.icon("arrow-up-right", color=trend_color, size=18),
+                            rx.cond(
+                                trend_icon == "arrow-down-right",
+                                rx.icon("arrow-down-right", color=trend_color, size=18),
+                                rx.icon("minus", color=trend_color, size=18)
+                            )
+                        ),
+                        margin_top="3",
+                        margin_left="1",
+                    ),
+                ),
+                align="center",
+                width="100%",
             ),
             spacing="1",
             align="start",
         ),
         width="100%",
         variant="classic",
-        background_color="#0f172a",  # Slate-900
-        border="1px solid rgba(99, 102, 241, 0.12)",
-        box_shadow="0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
+        background="rgba(15, 23, 42, 0.45)",  # Glassmorphism (Slate-900 com opacidade)
+        backdrop_filter="blur(16px)",          # Blur de fundo
+        border="1px solid rgba(255, 255, 255, 0.08)",
+        border_left=border_left,               # Borda esquerda colorida e chamativa
+        box_shadow="0 8px 32px 0 rgba(0, 0, 0, 0.37)",
         transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         _hover={
             "transform": "translateY(-4px)",
-            "box_shadow": f"0 12px 24px -10px rgba(0,0,0,0.4), 0 0 16px {cor}1a",
+            "box_shadow": f"0 12px 24px -10px rgba(0,0,0,0.5), 0 0 16px {cor}25",
             "border_color": f"{cor}60",
         },
         padding="5",
         border_radius="xl",
+    )
+
+
+def donut_chart_card() -> rx.Component:
+    """Card de Gráfico Donut de Status (Glassmorphism)."""
+    return rx.card(
+        rx.vstack(
+            rx.text("Distribuição por Status", size="2", color="#94a3b8", weight="medium"),
+            rx.recharts.pie_chart(
+                rx.recharts.pie(
+                    rx.recharts.cell(fill="#10b981"),  # Concluídas - Emerald
+                    rx.recharts.cell(fill="#3b82f6"),  # Em Andamento - Blue
+                    rx.recharts.cell(fill="#f59e0b"),  # Planejadas - Orange
+                    data=DashboardState.status_dist,
+                    data_key="value",
+                    name_key="name",
+                    cx="50%",
+                    cy="50%",
+                    inner_radius=45,
+                    outer_radius=65,
+                    padding_angle=5,
+                ),
+                rx.recharts.legend(
+                    vertical_align="bottom",
+                    height=30,
+                ),
+                rx.recharts.tooltip(),
+                width="100%",
+                height=180,
+            ),
+            spacing="2",
+            align="center",
+            width="100%",
+        ),
+        variant="classic",
+        background="rgba(15, 23, 42, 0.45)",  # Glassmorphism
+        backdrop_filter="blur(16px)",
+        border="1px solid rgba(255, 255, 255, 0.08)",
+        box_shadow="0 8px 32px 0 rgba(0, 0, 0, 0.37)",
+        padding="5",
+        border_radius="xl",
+        width="100%",
+        height="100%",
     )
 
 
@@ -235,7 +399,7 @@ def linha_iniciativa(iniciativa: Iniciativa) -> rx.Component:
         rx.table.cell(badge_prioridade(iniciativa["prioridade"])),
         rx.table.cell(
             rx.text(
-                formatar_roi(iniciativa["roi"]),
+                iniciativa["roi_fmt"],
                 weight="bold",
                 size="2",
                 color=rx.cond(iniciativa["roi"] > 0, "#10b981", "#94a3b8"),  # Emerald-500
@@ -243,30 +407,43 @@ def linha_iniciativa(iniciativa: Iniciativa) -> rx.Component:
         ),
         rx.table.cell(
             rx.icon(
-                rx.cond(iniciativa["tem_indicador"], "check-circle", "alert-circle"),
+                rx.cond(iniciativa["tem_indicador"], "circle-check", "circle-alert"),
                 color=rx.cond(iniciativa["tem_indicador"], "#10b981", "#f43f5e"),  # Emerald-500 / Rose-500
                 size=18,
             ),
         ),
         align="center",
-        _hover={"background_color": "rgba(255, 255, 255, 0.015)"},
+        _hover={"background_color": "rgba(255, 255, 255, 0.025)"},
         transition="background-color 0.2s ease",
     )
 
 
 def filtros_area() -> rx.Component:
-    """Selector de áreas estéreo com botões de capsula."""
+    """Selector de áreas com efeito gradiente no botão ativo e borda suave no inativo."""
     return rx.hstack(
         rx.foreach(
             DashboardState.areas,
             lambda area: rx.button(
                 area,
                 on_click=DashboardState.selecionar_area(area),
-                variant=rx.cond(DashboardState.area_selecionada == area, "solid", "outline"),
+                background=rx.cond(
+                    DashboardState.area_selecionada == area,
+                    "linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)",
+                    "transparent"
+                ),
+                border=rx.cond(
+                    DashboardState.area_selecionada == area,
+                    "none",
+                    "1px solid rgba(255, 255, 255, 0.15)"
+                ),
+                color=rx.cond(DashboardState.area_selecionada == area, "#ffffff", "#94a3b8"),
                 radius="full",
                 size="2",
-                color_scheme="indigo",
                 cursor="pointer",
+                _hover={
+                    "opacity": "0.9",
+                    "border_color": "rgba(255, 255, 255, 0.35)"
+                },
             ),
         ),
         spacing="2",
@@ -275,7 +452,7 @@ def filtros_area() -> rx.Component:
 
 
 def controles_live() -> rx.Component:
-    """Barra de controle em tempo real do estilo SaaS."""
+    """Barra de controle em tempo real do estilo SaaS (Glassmorphism)."""
     return rx.card(
         rx.hstack(
             # Indicador de atividade
@@ -302,7 +479,7 @@ def controles_live() -> rx.Component:
                 align="center",
             ),
 
-            rx.divider(orientation="vertical", size="2", color="rgba(255,255,255,0.05)"),
+            rx.divider(orientation="vertical", size="2", color="rgba(255,255,255,0.08)"),
 
             # Relógio
             rx.hstack(
@@ -312,7 +489,7 @@ def controles_live() -> rx.Component:
                 align="center",
             ),
 
-            rx.divider(orientation="vertical", size="2", color="rgba(255,255,255,0.05)"),
+            rx.divider(orientation="vertical", size="2", color="rgba(255,255,255,0.08)"),
 
             # Seletor de Intervalo
             rx.hstack(
@@ -363,8 +540,10 @@ def controles_live() -> rx.Component:
         ),
         width="100%",
         variant="classic",
-        background_color="#0f172a",  # Slate-900
-        border="1px solid rgba(255,255,255,0.04)",
+        background="rgba(15, 23, 42, 0.45)",  # Glassmorphism
+        backdrop_filter="blur(16px)",
+        border="1px solid rgba(255, 255, 255, 0.08)",
+        box_shadow="0 8px 32px 0 rgba(0, 0, 0, 0.37)",
         padding_x="4",
         padding_y="3",
         border_radius="xl",
@@ -410,81 +589,61 @@ def index() -> rx.Component:
                 # ── Controles Live ─────────────────────────
                 controles_live(),
 
-                # ── Grid de KPIs ───────────────────────────
-                rx.grid(
-                    kpi_card(
-                        "ROI Líquido Total",
-                        DashboardState.kpi_roi_fmt,
-                        "trending-up",
-                        "#10b981",  # Emerald-500 para indicadores positivos
+                # ── KPIs e Gráfico de Distribuição Status ───
+                rx.flex(
+                    # Grid de KPIs à esquerda (65% width no md)
+                    rx.box(
+                        rx.grid(
+                            kpi_card(
+                                "ROI Líquido Total",
+                                DashboardState.kpi_roi_fmt,
+                                "trending-up",
+                                "#10b981",  # Emerald
+                                "4px solid #10b981",
+                                trend_icon=DashboardState.roi_trend_icon,
+                                trend_color=DashboardState.roi_trend_color,
+                            ),
+                            kpi_card(
+                                "Horas Recuperadas",
+                                rx.text(DashboardState.kpi_horas, "h"),
+                                "clock",
+                                "#3b82f6",  # Cobalt Blue
+                                "4px solid #3b82f6",
+                                trend_icon=DashboardState.horas_trend_icon,
+                                trend_color=DashboardState.horas_trend_color,
+                            ),
+                            kpi_card(
+                                "Governança Média",
+                                rx.text(DashboardState.kpi_governanca, "%"),
+                                "shield-check",
+                                "#f43f5e",  # Rose
+                                "4px solid #f43f5e",
+                                trend_icon=DashboardState.governanca_trend_icon,
+                                trend_color=DashboardState.governanca_trend_color,
+                            ),
+                            kpi_card(
+                                "Total de Iniciativas",
+                                DashboardState.kpi_total,
+                                "layers",
+                                "#6366f1",  # Indigo
+                                "4px solid #6366f1",
+                                trend_icon="",
+                                trend_color="",
+                            ),
+                            columns=rx.breakpoints(initial="1", sm="2"),
+                            spacing="4",
+                            width="100%",
+                        ),
+                        width=rx.breakpoints(initial="100%", md="65%"),
                     ),
-                    kpi_card(
-                        "Horas Recuperadas",
-                        rx.text(DashboardState.kpi_horas, "h"),
-                        "clock",
-                        "#3b82f6",  # Cobalt Blue
+                    # Donut Chart à direita (35% width no md)
+                    rx.box(
+                        donut_chart_card(),
+                        width=rx.breakpoints(initial="100%", md="35%"),
                     ),
-                    kpi_card(
-                        "Governança Média",
-                        rx.text(DashboardState.kpi_governanca, "%"),
-                        "shield-check",
-                        "#f43f5e",  # Rose-500 para governança
-                    ),
-                    kpi_card(
-                        "Total de Iniciativas",
-                        DashboardState.kpi_total,
-                        "layers",
-                        "#6366f1",  # Indigo
-                    ),
-                    columns="4",
                     spacing="4",
                     width="100%",
-                    margin_top="2",
-                ),
-
-                # ── Sub-dashboard de status ─────────────────
-                rx.card(
-                    rx.hstack(
-                        rx.vstack(
-                            rx.text("Em Andamento", size="2", color="#94a3b8", weight="medium"),
-                            rx.text(
-                                DashboardState.kpi_em_andamento,
-                                size="7", weight="bold", color="#3b82f6",
-                            ),
-                            align="center",
-                            width="100%",
-                        ),
-                        rx.divider(orientation="vertical", size="3", color="rgba(255,255,255,0.05)"),
-                        rx.vstack(
-                            rx.text("Concluídas", size="2", color="#94a3b8", weight="medium"),
-                            rx.text(
-                                DashboardState.kpi_concluidas,
-                                size="7", weight="bold", color="#10b981",
-                            ),
-                            align="center",
-                            width="100%",
-                        ),
-                        rx.divider(orientation="vertical", size="3", color="rgba(255,255,255,0.05)"),
-                        rx.vstack(
-                            rx.text("Planejadas", size="2", color="#94a3b8", weight="medium"),
-                            rx.text(
-                                DashboardState.kpi_planejadas,
-                                size="7", weight="bold", color="#f59e0b",
-                            ),
-                            align="center",
-                            width="100%",
-                        ),
-                        spacing="6",
-                        justify="center",
-                        width="100%",
-                        align="center",
-                    ),
-                    width="100%",
-                    variant="classic",
-                    background_color="#0f172a",  # Slate-900
-                    border="1px solid rgba(255,255,255,0.04)",
-                    padding="4",
-                    border_radius="xl",
+                    flex_direction=rx.breakpoints(initial="column", md="row"),
                 ),
 
                 # ── Grid/Tabela de Governança ───────────────
@@ -512,14 +671,17 @@ def index() -> rx.Component:
                             ),
                             rx.table.body(
                                 rx.foreach(DashboardState.iniciativas, linha_iniciativa),
+                                css={"& tr:nth-of-type(odd)": {"background": "rgba(255, 255, 255, 0.015)"}},  # Alternar linhas
                             ),
                             width="100%",
-                            variant="surface",
+                            variant="ghost",  # Remove linhas verticais
                         ),
                         width="100%",
                         padding="0",
-                        border="1px solid rgba(255,255,255,0.04)",
-                        background_color="#0f172a",  # Slate-900
+                        background="rgba(15, 23, 42, 0.45)",  # Glassmorphism
+                        backdrop_filter="blur(16px)",
+                        border="1px solid rgba(255, 255, 255, 0.08)",
+                        box_shadow="0 8px 32px 0 rgba(0, 0, 0, 0.37)",
                         border_radius="xl",
                         overflow="hidden",
                     ),
