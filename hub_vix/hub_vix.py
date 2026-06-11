@@ -318,10 +318,10 @@ def kpi_card(label: str, valor, icon: str, cor: str, border_left: str, trend_ico
         ),
         width="100%",
         variant="classic",
-        background="rgba(15, 23, 42, 0.45)",  # Glassmorphism (Slate-900 com opacidade)
-        backdrop_filter="blur(16px)",          # Blur de fundo
+        background="rgba(255, 255, 255, 0.03)",  # Glassmorphism (opacidade super baixa)
+        backdrop_filter="blur(16px)",             # Blur de fundo
         border="1px solid rgba(255, 255, 255, 0.08)",
-        border_left=border_left,               # Borda esquerda colorida e chamativa
+        border_left=border_left,                  # Borda esquerda colorida e chamativa
         box_shadow="0 8px 32px 0 rgba(0, 0, 0, 0.37)",
         transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         _hover={
@@ -366,7 +366,7 @@ def donut_chart_card() -> rx.Component:
             width="100%",
         ),
         variant="classic",
-        background="rgba(15, 23, 42, 0.45)",  # Glassmorphism
+        background="rgba(255, 255, 255, 0.03)",  # Glassmorphism (opacidade super baixa)
         backdrop_filter="blur(16px)",
         border="1px solid rgba(255, 255, 255, 0.08)",
         box_shadow="0 8px 32px 0 rgba(0, 0, 0, 0.37)",
@@ -406,11 +406,11 @@ def linha_iniciativa(iniciativa: Iniciativa) -> rx.Component:
             ),
         ),
         rx.table.cell(
-            rx.icon(
-                rx.cond(iniciativa["tem_indicador"], "circle-check", "circle-alert"),
-                color=rx.cond(iniciativa["tem_indicador"], "#10b981", "#f43f5e"),  # Emerald-500 / Rose-500
-                size=18,
-            ),
+            rx.cond(
+                iniciativa["tem_indicador"],
+                rx.icon("circle-check", color="#10b981", size=18),
+                rx.icon("circle-alert", color="#f43f5e", size=18),
+            )
         ),
         align="center",
         _hover={"background_color": "rgba(255, 255, 255, 0.025)"},
@@ -540,7 +540,7 @@ def controles_live() -> rx.Component:
         ),
         width="100%",
         variant="classic",
-        background="rgba(15, 23, 42, 0.45)",  # Glassmorphism
+        background="rgba(255, 255, 255, 0.03)",  # Glassmorphism (opacidade super baixa)
         backdrop_filter="blur(16px)",
         border="1px solid rgba(255, 255, 255, 0.08)",
         box_shadow="0 8px 32px 0 rgba(0, 0, 0, 0.37)",
@@ -678,7 +678,7 @@ def index() -> rx.Component:
                         ),
                         width="100%",
                         padding="0",
-                        background="rgba(15, 23, 42, 0.45)",  # Glassmorphism
+                        background="rgba(255, 255, 255, 0.03)",  # Glassmorphism (opacidade super baixa)
                         backdrop_filter="blur(16px)",
                         border="1px solid rgba(255, 255, 255, 0.08)",
                         box_shadow="0 8px 32px 0 rgba(0, 0, 0, 0.37)",
