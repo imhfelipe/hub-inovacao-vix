@@ -1,5 +1,7 @@
 # Hub de Inovação VIX 🚀
 
+Este dashboard utiliza uma interface inspirada em sistemas de monitoramento de alta disponibilidade (Nexus-OS), focada em reduzir a carga cognitiva da diretoria através de elementos visuais de alto contraste e indicadores em tempo real.
+
 Painel estratégico de governança de projetos em tempo real.  
 Arquitetura modular e de alta performance de nível **SaaS Premium**: **Antivravity Core** (motor Python baseado em Dataclasses) + **Reflex** (interface reativa e moderna baseada em Radix Themes).
 
