@@ -2,6 +2,8 @@
 hub_vix/
 .web/
 .reflex/
+.states/
+reflex.lock/
 rxconfig.py
 __pycache__/
 *.pyc
