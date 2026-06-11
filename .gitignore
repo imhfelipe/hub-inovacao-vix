@@ -1,0 +1,10 @@
+# Reflex (não necessário para Streamlit)
+hub_vix/
+.web/
+.reflex/
+rxconfig.py
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
