@@ -1,12 +1,23 @@
-# Reflex (não necessário para Streamlit)
-hub_vix/
-.web/
-.reflex/
-.states/
-reflex.lock/
-rxconfig.py
-__pycache__/
-*.pyc
-.env
+# Virtual environments
 .venv/
 venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Reflex build and state files
+.web/
+.states/
+reflex.lock/
+
+# Env config
+.env
+
+# Backups / Old Streamlit files (optional, keeping untracked or ignored)
+app.py
+antivravity.py
