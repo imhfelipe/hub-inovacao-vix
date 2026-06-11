@@ -1,39 +1,39 @@
 # Hub de Inovação VIX 🚀
 
 Painel estratégico de governança de projetos em tempo real.  
-Arquitetura modular: **Antivravity** (motor Python) + **Streamlit** (interface reativa).
+Arquitetura modular e de alta performance de nível **SaaS Premium**: **Antivravity Core** (motor Python baseado em Dataclasses) + **Reflex** (interface reativa e moderna baseada em Radix Themes).
 
 ## ▶ Rodar localmente
 
+Certifique-se de que o Python esteja instalado e execute os seguintes comandos na raiz do projeto:
+
 ```bash
+# Instalar dependências
 pip install -r requirements.txt
-streamlit run app.py
+
+# Inicializar e rodar o servidor do Reflex
+reflex run
 ```
 
-## 🌐 Deploy no Streamlit Community Cloud (grátis)
+O aplicativo estará disponível em:
+- Frontend: `http://localhost:3000` (ou a porta subsequente disponível, como `:3003`)
+- Backend/API: `http://localhost:8000` (ou a porta subsequente disponível)
 
-1. Suba este repositório no GitHub
-2. Acesse [share.streamlit.io](https://share.streamlit.io)
-3. Clique em **"New app"**
-4. Selecione o repositório e o arquivo `app.py`
-5. Clique em **Deploy** — pronto! URL pública gerada automaticamente
-
-## 📁 Estrutura
+## 📁 Estrutura do Projeto
 
 ```
-├── app.py           # Interface Streamlit (frontend reativo)
-├── antivravity.py   # Motor de KPIs (backend de inteligência)
-├── requirements.txt # Dependências
+├── hub_vix/
+│   ├── __init__.py
+│   ├── hub_vix.py           # Interface reativa do Dashboard em Reflex (Radix UI)
+│   ├── antivravity_core.py  # Motor de Inteligência e processamento de KPIs (Dataclasses)
+├── rxconfig.py              # Arquivo de configuração do Reflex
+├── requirements.txt         # Dependências do projeto (Reflex, Pandas)
 └── README.md
 ```
 
-## ⚙️ Como funciona o tempo real
+## ⚙️ Funcionalidades em Tempo Real & Design System
 
-O dashboard usa `st.rerun()` com `time.sleep(1)` para atualizar automaticamente.  
-O motor `antivravity.py` simula variações de dados a cada ciclo (±3% ROI, ±2h).
-
-Controles disponíveis na sidebar:
-- 🔴 **Modo Ao Vivo** — ativa/pausa o auto-refresh
-- ⏱ **Intervalo** — 3 / 5 / 10 / 30 / 60 segundos
-- 🏢 **Filtro por Área** — TI, Infra, RH, Comercial
-- 🔄 **Atualizar Agora** — refresh manual imediato
+O painel é reativo e atualiza seus dados de forma assíncrona usando o recurso de **background tasks** do Reflex:
+- **Relógio e Refresh:** Sincronizado a cada 1 segundo no frontend.
+- **Modo Ao Vivo:** Simulação em tempo real (variação de ±3% de ROI, ±2h de esforço e chance de mudança de status de projetos a cada ciclo).
+- **Design System SaaS:** Fundo escuro em tom slate-950, cartões de KPI integrados no slate-900 com gradientes nas bordas, sombras suaves, efeitos dinâmicos de hover e badges de prioridade/status baseadas em cores corporativas (Emerald-500 para positivo, Rose-500 para governança pendente).
